@@ -1,4 +1,4 @@
-# 📊 Étude statistique des relations entre variables
+# 📊 Comprendre les données clients par la statistique
 
 ## ✍️ Auteur  
 **Minko NEIL-JOVY**
