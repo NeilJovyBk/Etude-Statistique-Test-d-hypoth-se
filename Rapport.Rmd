@@ -1,0 +1,393 @@
+---
+title: "Rapport étude statistique"
+author: Minko NEIL-JOVY
+output:
+  prettydoc::html_pretty:
+    theme: cayman       
+    highlight: github   
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,     
+  warning = FALSE,  
+  message = FALSE   
+)
+```
+
+
+## **Introduction**
+
+L’objectif de ce projet est de conduire une **étude statistique approfondie sur les relations entre différentes variables** à partir de jeux de données variés, représentatifs de situations concrètes en marketing, satisfaction client et comportement sur les réseaux sociaux.
+
+À travers une série d’analyses croisées entre **variables qualitatives, quantitatives et ordinales**, nous cherchons à déterminer l’existence de **liens statistiques significatifs** entre des phénomènes observés : influence de l’âge sur la plateforme de média social utilisée, impact du niveau de satisfaction sur la probabilité de recommandation, ou encore effet d’un groupe marketing sur le montant d’achat moyen.
+
+Chaque analyse suit une méthodologie rigoureuse : exploration univariée, visualisation des distributions, formulation d’hypothèses, application de **tests statistiques** adaptés (Chi², corrélations de Pearson/Spearman/Kendall, tests de Student/Welch/Wilcoxon, ANOVA, etc.), et interprétation des résultats.  
+Ce travail mobilise également les **visualisations de données avec ggplot2**, pour mieux comprendre les dynamiques sous-jacentes et communiquer les résultats de façon claire et accessible.
+
+L’ensemble des traitements est réalisé sous **R**, en s’appuyant sur des packages reconnus pour leur robustesse en science des données.
+
+
+
+### **📊 Description des jeux de données**
+
+---
+
+#### - 📱 Réseaux sociaux et tranches d’âge (`base_de_donnees_media_sociaux.csv`)
+
+Chaque ligne correspond à un utilisateur de réseau social.
+
+| Variable                 | Type     | Description |
+|--------------------------|----------|-------------|
+| `Tranche_d_age`          | factor   | Tranche d’âge de l’utilisateur (ex. : 18-25, 26-35…) |
+| `Plateforme_Media_Social`| factor   | Plateforme préférée (Facebook, Instagram, TikTok, etc.) |
+| `Niveau_Education`       | factor   | Niveau d’éducation déclaré (secondaire, universitaire, etc.) |
+
+---
+
+#### - 💰 Données marketing et dépenses (`data_marketing.csv`)
+
+Chaque ligne représente un enregistrement contenant des informations de performance économique.
+
+| Variable                 | Type     | Description |
+|--------------------------|----------|-------------|
+| `Revenu`                 | numeric  | Revenu généré (en unités monétaires) |
+| `Depenses_Publicitaires` | numeric  | Montant investi en publicité |
+
+---
+
+#### - 😊 Satisfaction client et recommandation (`recommandation_satisfaction.csv`)
+
+Chaque ligne correspond à la réponse d’un client.
+
+| Variable                      | Type     | Description |
+|-------------------------------|----------|-------------|
+| `Niveau_de_Satisfaction`      | ordered factor | Niveau de satisfaction de 1 (Très insatisfait) à 5 (Très satisfait) |
+| `Probabilite_de_Recommandation` | ordered factor | Probabilité de recommander, de 1 (Très peu probable) à 4 (Très probable) |
+
+---
+
+#### - 🛍️ Données marketing – comparaison de groupes (`donnees_marketing.csv`)
+
+Chaque ligne représente un client attribué à un groupe marketing expérimental.
+
+| Variable         | Type     | Description |
+|------------------|----------|-------------|
+| `Groupe`         | factor   | Groupe de marketing (A ou B) |
+| `Montant_Achat`  | numeric  | Montant d’achat réalisé par le client |
+
+---
+
+#### - 🛍️ Données marketing – 3 groupes (`donnees_marketing_3_groupes.csv`)
+
+Même structure que le fichier précédent, mais avec trois groupes de marketing.
+
+| Variable             | Type     | Description |
+|----------------------|----------|-------------|
+| `Groupe_Marketing`   | factor   | Groupe de marketing (A, B ou C) |
+| `Montant_Achat`      | numeric  | Montant d’achat réalisé par le client |
+
+---
+
+
+
+## **Analyse et réponses aux questions**
+
+```{r chargement-librairies, message=FALSE}
+# Chargement des packages nécessaires
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(vcd)
+library(car)
+library(scales)
+```
+
+
+
+```{r}
+# Importation des données
+
+# Données sur les réseaux sociaux
+media_sociaux <- read.csv("data/base_de_donnees_media_sociaux.csv", sep = ",", header = TRUE)
+
+# Données marketing simples
+marketing_data <- read.csv("data/data_marketing.csv", sep = ",", header = TRUE)
+
+# Données satisfaction et recommandation
+satisfaction_data <- read.csv("data/recommandation_satisfaction.csv", sep = ",", header = TRUE)
+
+# Données marketing avec 2 groupes
+groupes_data <- read.csv("data/donnees_marketing.csv", sep = ",", header = TRUE)
+
+# Données marketing avec 3 groupes
+groupes3_data <- read.csv("data/donnees_marketing_3_groupes.csv", sep = ",", header = TRUE)
+```
+
+---
+
+## **Analyse des relations entre variables qualitatives (Quali - Quali)**
+
+### **Question 1 : Y a-t-il une association entre la tranche d’âge et la plateforme de média social préférée ?**
+
+#### 🎯 Objectif :
+Étudier si certaines tranches d'âge sont plus attirées par des plateformes spécifiques (Facebook, Instagram, TikTok, etc.).
+
+#### 🧪 Hypothèse :
+
+- H₀ (hypothèse nulle) : Il n’y a **aucune association** entre la tranche d’âge et la plateforme préférée.
+- H₁ (hypothèse alternative) : Il existe une **association significative** entre la tranche d’âge et la plateforme utilisée.
+
+
+```{r}
+# Répartition par tranche d’âge
+age_plot <- ggplot(media_sociaux, aes(x = Tranche_d_age, fill = Plateforme_Media_Social)) +
+  geom_bar(position = "fill") +
+  labs(title = "Répartition des plateformes selon la tranche d’âge",
+       x = "Tranche d’âge", y = "Proportion") +
+  theme_minimal()
+
+# Répartition par plateforme
+platform_plot <- ggplot(media_sociaux, aes(x = Plateforme_Media_Social, fill = Tranche_d_age)) +
+  geom_bar(position = "fill") +
+  labs(title = "Répartition des tranches d’âge selon la plateforme",
+       x = "Plateforme", y = "Proportion") +
+  theme_minimal()
+
+# Affichage
+age_plot
+platform_plot
+
+```
+
+
+
+#### 🧠 Interprétation des graphiques :
+
+Les deux graphiques en barres empilées permettent de visualiser la répartition croisée entre tranches d’âge et plateformes utilisées.
+
+On remarque visuellement des préférences différentes selon les âges : certaines tranches d’âge utilisent majoritairement une plateforme spécifique. Cette tendance suggère un lien possible entre les deux variables.
+
+Nous allons maintenant le confirmer statistiquement.
+
+
+```{r}
+# Tableau de contingence
+contingence <- table(media_sociaux$Tranche_d_age, media_sociaux$Plateforme_Media_Social)
+
+# Test du Chi²
+test_chi2 <- chisq.test(contingence)
+
+# Coefficient de Cramer
+n <- sum(contingence)
+phi2 <- test_chi2$statistic / n
+r <- nrow(contingence)
+k <- ncol(contingence)
+cramer_v <- sqrt(phi2 / (min(k - 1, r - 1)))
+
+# Résultats
+test_chi2
+cramer_v
+
+```
+#### ✅ Conclusion :
+
+- **P-valeur du test de Chi² :** si elle est **< 0,05**, l’hypothèse nulle est rejetée, ce qui signifie qu’il existe une **association significative** entre l’âge et la plateforme préférée.
+- **Coefficient de Cramer (V) :** 
+  - V < 0.1 → association très faible
+  - 0.1 ≤ V < 0.3 → association faible
+  - 0.3 ≤ V < 0.5 → association modérée
+  - V ≥ 0.5 → association forte
+
+Dans ce cas, la relation semble **statistiquement significative** et **modérément marquée**, ce qui confirme les observations visuelles.
+
+---
+
+
+
+## **Analyse des relations entre variables quantitatives (Quanti - Quanti)**
+
+
+### **Question 2 : Existe-t-il une corrélation entre le revenu et les dépenses publicitaires ?**
+
+#### 🎯 Objectif :
+Analyser s’il existe une relation linéaire ou monotone entre le revenu généré et les dépenses en publicité.
+
+#### 🧪 Hypothèse :
+
+- H₀ (nulle) : Il n’y a **aucune corrélation** entre le revenu et les dépenses publicitaires.
+- H₁ (alternative) : Il existe une **corrélation significative** entre ces deux variables.
+
+
+```{r}
+# Visualisation du nuage de points
+ggplot(marketing_data, aes(x = Revenu, y = Depenses_Publicitaires)) +
+  geom_point(color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Corrélation entre Revenu et Dépenses Publicitaires",
+       x = "Revenu", y = "Dépenses Publicitaires") +
+  theme_minimal()
+
+```
+
+
+
+#### 🧠 Interprétation du graphique :
+
+Le nuage de points montre visuellement une tendance à la hausse, suggérant une relation potentielle entre revenu et dépenses.  
+Une droite de régression a été ajoutée pour visualiser la linéarité. Le lien semble positif, mais l’intensité reste à vérifier.
+
+Nous allons maintenant tester cette corrélation avec différents coefficients.
+
+```{r}
+# Corrélations
+pearson <- cor.test(marketing_data$Revenu, marketing_data$Depenses_Publicitaires, method = "pearson")
+spearman <- cor.test(marketing_data$Revenu, marketing_data$Depenses_Publicitaires, method = "spearman")
+kendall <- cor.test(marketing_data$Revenu, marketing_data$Depenses_Publicitaires, method = "kendall")
+
+# Résultats
+pearson
+spearman
+kendall
+
+```
+#### ✅ Conclusion :
+
+- **Pearson** mesure la corrélation linéaire (utilisée si les distributions sont normales).
+- **Spearman** et **Kendall** mesurent la monotonie (utilisées si données non normales ou ordinales).
+
+Si la p-valeur est **< 0,05**, cela confirme une **corrélation significative**.  
+Le coefficient entre 0 et 1 donne la **force de la relation** (0,3 = faible ; 0,5 = modérée ; 0,7+ = forte).
+
+Dans ce cas, on peut conclure à une **relation significative positive** entre revenu et dépenses publicitaires.
+
+
+---
+
+
+
+## ** Analyse des relations entre une variable qualitative et une variable quantitative (Quali - Quanti)**
+
+
+### **Question 3 : Le montant d’achat est-il significativement différent entre les groupes A et B ?**
+
+#### 🎯 Objectif :
+Comparer les comportements d’achat entre deux groupes de clients soumis à des campagnes marketing différentes.
+
+#### 🧪 Hypothèse :
+
+- H₀ (nulle) : Il n’y a **aucune différence** significative du montant d’achat entre les deux groupes.
+- H₁ (alternative) : Il existe une **différence significative** entre les groupes.
+
+
+```{r}
+# Boxplot du montant d’achat par groupe
+ggplot(groupes_data, aes(x = Groupe, y = Montant_Achat, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "Montant d’achat par groupe marketing",
+       x = "Groupe", y = "Montant d’achat") +
+  theme_minimal()
+
+```
+
+
+
+#### 🧠 Interprétation du graphique :
+
+Le boxplot permet de visualiser les médianes, la dispersion et les potentiels écarts entre les deux groupes.  
+Une différence apparente peut être observée, mais elle doit être confirmée statistiquement à l’aide de tests de comparaison.
+
+On testera la moyenne (Student/Welch) ou la médiane (Wilcoxon) selon la distribution des données.
+
+```{r}
+# Vérification des conditions : normalité et homogénéité des variances
+shapiro.test(groupes_data$Montant_Achat)
+leveneTest(Montant_Achat ~ Groupe, data = groupes_data)
+
+# Test de Student (si variances égales), sinon test de Welch
+t.test(Montant_Achat ~ Groupe, data = groupes_data, var.equal = FALSE)
+
+# Test non paramétrique de Wilcoxon
+wilcox.test(Montant_Achat ~ Groupe, data = groupes_data)
+
+```
+#### ✅ Conclusion :
+
+- Si les données ne sont pas normales ou les variances inégales, on privilégie le **test de Welch** ou le **Wilcoxon**.
+- Si la p-valeur est **< 0,05**, alors la différence entre les groupes est **statistiquement significative**.
+
+Les résultats montrent que les groupes n’ont **pas le même comportement d’achat**, ce qui suggère un **effet du groupe marketing** sur la dépense.
+
+
+---
+
+
+## **Analyse des relations entre variables ordinales (Ordinal - Ordinal)**
+
+
+### **Question 4 : Existe-t-il une relation entre le niveau de satisfaction et la probabilité de recommandation ?**
+
+#### 🎯 Objectif :
+Évaluer si les clients les plus satisfaits sont aussi les plus susceptibles de recommander le service ou produit.
+
+#### 🧪 Hypothèse :
+
+- H₀ (nulle) : Il n’y a **aucune relation** entre la satisfaction et la recommandation.
+- H₁ (alternative) : Il existe une **relation croissante ou décroissante** entre ces deux variables ordinales.
+
+
+```{r}
+# Transformation en facteurs ordonnés
+satisfaction_data$Niveau_de_Satisfaction <- factor(satisfaction_data$Niveau_de_Satisfaction, ordered = TRUE)
+satisfaction_data$Probabilite_de_Recommandation <- factor(satisfaction_data$Probabilite_de_Recommandation, ordered = TRUE)
+
+# Visualisation
+ggplot(satisfaction_data, aes(x = Niveau_de_Satisfaction, fill = Probabilite_de_Recommandation)) +
+  geom_bar(position = "fill") +
+  labs(title = "Recommandation selon le niveau de satisfaction",
+       x = "Satisfaction", y = "Proportion") +
+  theme_minimal()
+
+```
+
+
+#### 🧠 Interprétation du graphique :
+
+On observe que plus le niveau de satisfaction augmente, plus la proportion de clients "très probables" à recommander augmente aussi.  
+Cela laisse penser à une relation ordinale croissante.
+
+Nous allons le confirmer par des tests statistiques adaptés aux échelles ordinales.
+
+
+```{r}
+# Tableau de contingence
+contingence <- table(satisfaction_data$Niveau_de_Satisfaction, satisfaction_data$Probabilite_de_Recommandation)
+chisq.test(contingence)
+
+# Coefficient de Cramer
+n <- sum(contingence)
+phi2 <- chisq.test(contingence)$statistic / n
+r <- nrow(contingence)
+k <- ncol(contingence)
+cramer_v <- sqrt(phi2 / (min(k - 1, r - 1)))
+
+# Corrélation de Spearman
+cor(as.numeric(satisfaction_data$Niveau_de_Satisfaction),
+    as.numeric(satisfaction_data$Probabilite_de_Recommandation), method = "spearman")
+
+# Corrélation de Kendall
+cor(as.numeric(satisfaction_data$Niveau_de_Satisfaction),
+    as.numeric(satisfaction_data$Probabilite_de_Recommandation), method = "kendall")
+
+```
+
+#### ✅ Conclusion :
+
+- La **p-valeur du Chi²** permet de confirmer l’existence d’une liaison entre les deux variables ordinales.
+- Les **corrélations de Spearman et Kendall** confirment si la relation est monotone.
+- Le **V de Cramer** mesure l’intensité.
+
+Dans ce cas, tous les indicateurs suggèrent une **relation positive** : plus un client est satisfait, plus il est probable qu’il recommande.
+
